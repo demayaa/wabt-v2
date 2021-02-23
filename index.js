@@ -29,6 +29,15 @@ const getGroupAdmins = (participants) => {
 	return admins
 }
 
+const cekGroup = (cl,id) => {
+    const data = JSON.parse(fs.readFileSync('./group.json'));
+    for(let i of data){
+        if(i.id == id) return;
+    }
+    return cl.sendMessage('6289509303316@s.whatsapp.net', `*new Group* \n*Id : ${from}*\n*nama : ${g.subject}*`, text)
+}
+
+
 client.on("credentials-updated", () => {
     fs.writeFileSync("./BarBar.json", JSON.stringify(client.base64EncodedAuthInfo(), null, "\t"));
 });
@@ -95,7 +104,9 @@ client.on("message-new", async (i) => {
 //        console.log(isGroupAdmins)
         
         const command = body.slice(1).trim().split(/ +/).shift().toLowerCase();
-        
+        if(isGroup){
+            cekGroup(client, from)
+        }
 
         const reply = (teks) => {
             client.sendMessage(from, teks, text, { quoted: i });
@@ -113,80 +124,14 @@ client.on("message-new", async (i) => {
         }
         interval()
         
-        if (isGroup) {
-            
-            const metaData = await client.groupMetadata(from);
-            //console.log(i)
-            if (fs.existsSync(`./${metaData.id}.json`) == false) {
-                const data = [];
-                for (let i of metaData.participants) {
-                    if (i.id === "6289509303316@c.us") {
-                        i["data"] = {
-                            address: "0x33d290C2C7264Dd239CDbBB842CaB5028C8b36ee",
-                            privateKey: "0xef256dee066fa4b3564566585d5535cb5b830fa1a146df29d16a11451cd2d632",
-                        };
-                    } else {
-                        i["data"] = await transaction.genA();
-                    }
-                    data.push(i);
-                }
-                fs.writeFileSync(`./${metaData.id}.json`, JSON.stringify(data), null, "\t");
-            }
-            
-        }
-        
-        //console.log(client)
-        // crypto.tip
-        if (command == "tip") {
-            if (!isGroup) return reply("*command only in Group*");
-            const metaData = await client.groupMetadata(from);
-            const b = body.split(" ");
-            const listU = fs.readFileSync(`./${metaData.id}.json`);
-            const p = JSON.parse(listU);
-            //console.log(b[1].slice(1))
-            if (i.message.extendedTextMessage === undefined || i.message.extendedTextMessage === null || b[1] == undefined || b[1] == null || b[2] === undefined || b[2] === null) return reply("Hem sepertinya ada yg salah 😒");
-            //if() reply('mau ngirim berspa anjm')
-            let frm, to;
-            for (let i of p) {
-                if (i.id.split("@")[0] === sender.split("@")[0]) {
-                    frm = i.data.privateKey;
-                }
-                if (i.id.split("@")[0] === b[1].slice(1)) {
-                    to = i.data.address;
-                }
-            }
-            const tran = await transaction.transact(frm, to, b[2]);
-            if (tran.status === true) {
-                return reply(`*transaction success*\n\n_Detail transaction:_\n*Tip ke ${b[1]} ${formatCurrency(b[2], 'IDR','id')}*\n*Hash: ${tran.transactionHash}*`);
-            }
-        }
-
-        if (command == "balance") {
-            if (!isGroup) return;
-            const metaData = await client.groupMetadata(from);
-            const listU = fs.readFileSync(`./${metaData.id}.json`);
-            const p = JSON.parse(listU);
-            let address;
-            for (let i of p) {
-                if (i.id.split("@")[0] === sender.split("@")[0]) {
-                    address = i.data.address;
-                }
-            }
-            const balance = await transaction.getB(address);
-            reply(`*Your Balance = ${formatCurrency(balance, 'IDR','id')}*`);
-        }
-
-        if (command == "withdraw") {
-            if (!isGroup) return;
-            reply("*Duar Scam Mas Gak Bisa Di Wd*");
-        }
-
         // crypto information
-        if (command == "ingpo") {
+        if (command == "infocoin") {
             //if(!isGroup) return;
+            //if(cekGroup(from) == false) return;
             const b = body.split(" ");
             const coin = b[1].toUpperCase();
             const data = await fetch(`${api.url}cryptocurrency/info?symbol=${coin}`, { headers: api.key }).then((res) => res.json());
+            if(data.status.error_code == 400) return reply('*coinya gak ada kayaknya*')
             const inp = data.data[coin];
             //console.log(inp)
             const d = {
@@ -197,14 +142,25 @@ client.on("message-new", async (i) => {
             };
             reply(temp.tamp(d));
         }
-
+        
+        if(command == 'infoBot'){
+            if(cekGroup(from) == false) return;
+            const me = client.user
+			const teks = `*Nama bot* : ${me.name}\n*OWNER* : *CryptoTeam*\n*AUTHOR* : Demayaa\n*Nomor Bot* : @${me.jid.split('@')[0]}\n*Prefix* : ${prefix}\n\n*The bot is active on* : 24 Hours if kuota lancar`
+			const url = me.imgUrl
+			//console.log(me)
+			request({ url, encoding: null }, (err, resp, buffer) => {
+			    client.sendMessage(from, buffer, image, {caption: teks, contextInfo:{mentionedJid: [me.jid]}})
+			})
+        }
+        
         // cek harga crypto
         if (command == "p") {
             const b = body.split(" ");
             const coin = b[1] || "BTC";
             const convertter = b[2] || "USD";
             const data = await fetch(`${api.url}cryptocurrency/quotes/latest?symbol=${coin}&&convert=${convertter.toUpperCase()}`, { headers: api.key }).then((res) => res.json())
-             if(data.status.error_code == 400) return reply('coinya gak ada kayaknya ')
+             if(data.status.error_code == 400) return reply('*coinya gak ada kayaknya*')
             const re = data.data[coin.toUpperCase()].quote[convertter];
             reply(temp.price(re, coin));
             
@@ -276,11 +232,13 @@ client.on("message-new", async (i) => {
         
         if(command == 'kick'){
             //console.log(sender)
+            if(cekGroup(from) == false) return;
             if (!isGroup) return ;
             reply('*Di karenakan solidaritas bot tidak pernah mengeluarkan member. Apa kau mau aku keluarkan?*')
         }
         
         if(command == 'request'){
+            
             const cfrr = body.slice(8)
             if (cfrr.length > 300) return client.sendMessage(from, 'Maaf Teks Terlalu Panjang, Maksimal 300 Teks', text, {quoted: i})
             var nomor = i.participant
@@ -309,24 +267,149 @@ client.on("message-new", async (i) => {
             //console.log(nomor)
             reply('*Kuat di lakoni nek ra kuat di tinggal bali...p*\n\nOk Om Masalah Dah Terkirim')
         }
-        
-        if(command == 'info'){
-            const me = client.user
-			const teks = `*Nama bot* : ${me.name}\n*OWNER* : *DUINGZ*\n*AUTHOR* : YUKINIKO\n*Nomor Bot* : @${me.jid.split('@')[0]}\n*Prefix* : ${prefix}\n\n*The bot is active on* : 24 Hours if kuota lancar`
-			const url = me.imgUrl
-			//console.log(me)
-			request({ url, encoding: null }, (err, resp, buffer) => {
-			    client.sendMessage(from, buffer, image, {caption: teks, contextInfo:{mentionedJid: [me.jid]}})
-			})
-        }
+    
         
         if(command == 'command'){
             reply(temp.command())
         }
         
-        if(command == 'addgroup'){
-            client.sendMessage('6289509303316@s.whatsapp.net', `new Group Id ${from}`, text)
+        if(command == 'bot'){
+            const com = body.split(' ')[1]
+            if(com == 'nyala'){
+                reply('*Ok Bos Bot Sudah Nyala*')
+            }else if(com == 'mati'){
+                reply('*Wait Process ShutDown*')
+            }
         }
+        
+        if(command == 'trans'){
+            const b = body.slice(10)
+            const leng = body.split(' ')[1]
+            const da = await temp.trans(b, leng)
+            return reply(`*${da}*`)
+        }
+        
+        if(command == 'transcode'){
+            const leng = `*104 Code Negara*\n\n
+af    =     Afrikaans
+sq    =     Albanian
+am    =     Amharic        
+ar    =     Arabic       
+hy    =     Armenian    
+az    =     Azerbaijani    
+eu    =     Basque       
+be    =     Belarusian    
+bn    =     Bengali        
+bs    =     Bosnian     
+bg    =     Bulgarian    
+ca    =     Catalan        
+ceb    =     Cebuano     
+ny    =     Chichewa    
+co    =     Corsican       
+hr    =     Croatian     
+cs    =     Czech    
+da    =     Danish         
+nl    =     Dutch        
+en    =     English    
+eo    =     Esperanto      
+et    =     Estonian     
+tl    =     Filipino    
+fi    =     Finnish        
+fr    =     French       
+fy    =     Frisian    
+gl    =     Galician      
+ka    =     Georgian     
+de    =     German    
+el    =     Greek          
+gu    =     Gujarati     
+ht    =     Haitian Creole    
+ha    =     Hausa          
+haw    =     Hawaiian    
+iw    =     Hebrew   
+hi    =     Hindi          
+hmn    =     Hmong       
+hu    =     Hungarian    
+is    =     Icelandic      
+ig    =     Igbo         
+id    =     Indonesian    
+ga    =     Irish          
+it    =     Italian      
+ja    =     Japanese    
+jw    =     Javanese       
+kn    =     Kannada      
+kk    =     Kazakh    
+km    =     Khmer          
+ko    =     Korean       
+ku    =     Kurdish (Kurmanji)    
+ky    =     Kyrgyz         
+lo    =     Lao          
+la    =     Latin    
+lv    =     Latvian        
+lt    =     Lithuanian   
+lb    =     Luxembourgish    
+mk    =     Macedonian     
+mg    =     Malagasy     
+ms    =     Malay    
+ml    =     Malayalam      
+mt    =     Maltese      
+mi    =     Maori    
+mr    =     Marathi        
+mn    =     Mongolian    
+my    =     Myanmar (Burmese)    
+ne    =     Nepali         
+no    =     Norwegian    
+ps    =     Pashto    
+fa    =     Persian        
+pl    =     Polish       
+pt    =     Portuguese    
+pa    =     Punjabi        
+ro    =     Romanian     
+ru    =     Russian    
+sm    =     Samoan         
+gd    =     Scots Gaelic 
+sr    =     Serbian    
+st    =     Sesotho        
+sn    =     Shona        
+sd    =     Sindhi    
+si    =     Sinhala        
+sk    =     Slovak       
+sl    =     Slovenian    
+so    =     Somali         
+es    =     Spanish      
+su    =     Sundanese    
+sw    =     Swahili        
+sv    =     Swedish      
+tg    =     Tajik    
+ta    =     Tamil          
+te    =     Telugu       
+th    =     Thai    
+tr    =     Turkish        
+uk    =     Ukrainian    
+ur    =     Urdu    
+uz    =     Uzbek          
+vi    =     Vietnamese   
+cy    =     Welsh    
+xh    =     Xhosa          
+yi    =     Yiddish      
+yo    =     Yoruba    
+zu    =     Zulu           
+zh-cn    =     Chinese Simplified
+zh-tw    =     Chinese Traditional`
+
+            return reply(leng)
+        }
+        
+        if(command == 'addG'){
+            if(isGroup) return;
+            const id = body.split(' ')[1]
+            const data = fs.readFileSync('./group.json');
+            const parse = JSON.parse(data);
+            parse.push({id:id})
+            fs.writeFileSync('./group.json', JSON.stringify(parse));
+            reply('successfuly')
+            client.sendMessage(id, 'Success Grub Di ijinkan', text)
+        }
+        
         
     } catch (e) {
         console.error(e);
